@@ -23,6 +23,16 @@ struct QueryResult {
     std::string message;
 };
 
+// Combined schema for JOINs (multiple tables)
+struct CombinedSchema {
+    std::vector<std::string> table_names;
+    std::vector<TableSchema> schemas;
+    std::vector<std::pair<std::string, int>> column_to_table;  // column name -> table index
+    
+    int getColumnIndex(const std::string& col_name, const std::string& table_name = "") const;
+    int getTotalColumns() const;
+};
+
 // Query executor
 class Executor {
 public:
@@ -47,9 +57,33 @@ private:
     std::vector<Row> scanTable(const std::string& table_name);
     bool insertRow(const std::string& table_name, const Row& row);
     
+    // JOIN operations
+    std::vector<Row> executeJoin(const std::string& left_table, 
+                                  const std::vector<JoinClause>& joins,
+                                  CombinedSchema& combined_schema);
+    std::vector<Row> innerJoin(const std::vector<Row>& left_rows,
+                                const std::vector<Row>& right_rows,
+                                const Expression* on_condition,
+                                const CombinedSchema& schema,
+                                size_t left_cols);
+    std::vector<Row> leftJoin(const std::vector<Row>& left_rows,
+                               const std::vector<Row>& right_rows,
+                               const Expression* on_condition,
+                               const CombinedSchema& schema,
+                               size_t left_cols, size_t right_cols);
+    
+    // Aggregate operations
+    Value computeAggregate(AggregateType type, const std::vector<Value>& values);
+    std::vector<Row> applyGroupBy(const std::vector<Row>& rows,
+                                   const std::vector<std::string>& group_by,
+                                   const std::vector<SelectColumn>& select_cols,
+                                   const CombinedSchema& schema);
+    
     // Expression evaluation
     Value evaluateExpression(const Expression* expr, const Row& row, const TableSchema& schema);
+    Value evaluateExpressionCombined(const Expression* expr, const Row& row, const CombinedSchema& schema);
     bool evaluateCondition(const Expression* expr, const Row& row, const TableSchema& schema);
+    bool evaluateConditionCombined(const Expression* expr, const Row& row, const CombinedSchema& schema);
     
     // Row serialization
     std::string serializeRow(const Row& row, const TableSchema& schema);
@@ -57,6 +91,8 @@ private:
     
     // Helper functions
     bool matchesWhere(const Expression* where, const Row& row, const TableSchema& schema);
+    bool matchesWhereCombined(const Expression* where, const Row& row, const CombinedSchema& schema);
+    std::string getColumnDisplayName(const SelectColumn& col, const CombinedSchema& schema);
 };
 
 } // namespace minidb

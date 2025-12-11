@@ -1,43 +1,62 @@
-# MiniDB - A Simple Database Engine
+# MiniDB
 
-A zero-dependency SQL database engine written in C++17. This is a learning project that implements core database concepts from scratch.
+A lightweight, zero-dependency SQL database engine written in C++17.
 
 ## Features
 
-- **Page-based Storage Engine** - 4KB pages with slot-based record storage
-- **Buffer Pool** - LRU eviction policy for in-memory page caching
-- **B+ Tree Index** - For efficient key lookups on primary keys
-- **SQL Parser** - Hand-written recursive descent parser
-- **Query Executor** - Supports SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, DROP TABLE
+- **Storage Engine**: Page-based storage with buffer pool management (LRU eviction)
+- **Indexing**: B+ Tree with full delete support (underflow handling via merge/redistribute)
+- **SQL Parser**: Hand-written recursive descent parser
+- **Query Executor**: Support for DDL and DML operations
+- **Aggregate Functions**: COUNT, SUM, AVG, MIN, MAX with GROUP BY support
+- **JOIN Support**: INNER JOIN, LEFT JOIN, RIGHT JOIN
+- **Write-Ahead Logging (WAL)**: Crash recovery support
+- **Concurrency Control**: Read-write locks and lock manager for multi-threading
+- **Query Optimizer**: Cost-based optimization with index scan detection
+- **CLI Interface**: Interactive command-line interface
 
 ## Supported SQL
 
+### Data Definition Language (DDL)
 ```sql
--- Create a table
-CREATE TABLE users (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    age INT,
-    active BOOL
+CREATE TABLE table_name (
+    column1 INT PRIMARY KEY,
+    column2 VARCHAR(50),
+    column3 FLOAT,
+    column4 BOOL
 );
 
--- Insert data
-INSERT INTO users VALUES (1, 'Alice', 30, TRUE);
-INSERT INTO users (id, name) VALUES (2, 'Bob');
+DROP TABLE table_name;
+```
 
--- Query data
-SELECT * FROM users;
-SELECT name, age FROM users WHERE age > 25;
-SELECT * FROM users ORDER BY name DESC LIMIT 10;
+### Data Manipulation Language (DML)
+```sql
+-- Insert
+INSERT INTO table_name (col1, col2) VALUES (1, 'hello');
+INSERT INTO table_name VALUES (1, 'hello', 3.14, true);
 
--- Update data
-UPDATE users SET age = 31 WHERE id = 1;
+-- Select
+SELECT * FROM table_name;
+SELECT col1, col2 FROM table_name WHERE col1 > 10;
+SELECT * FROM table_name ORDER BY col1 DESC LIMIT 10;
+SELECT DISTINCT col1 FROM table_name;
 
--- Delete data
-DELETE FROM users WHERE active = FALSE;
+-- Aggregate Functions
+SELECT COUNT(*) FROM table_name;
+SELECT SUM(col1), AVG(col1) FROM table_name;
+SELECT MIN(col1), MAX(col1) FROM table_name;
+SELECT col1, COUNT(*) FROM table_name GROUP BY col1;
 
--- Drop table
-DROP TABLE users;
+-- JOINs
+SELECT t1.col1, t2.col2 FROM table1 t1 
+    JOIN table2 t2 ON t1.id = t2.id;
+SELECT * FROM table1 LEFT JOIN table2 ON table1.id = table2.id;
+
+-- Update
+UPDATE table_name SET col1 = 10 WHERE col2 = 'test';
+
+-- Delete
+DELETE FROM table_name WHERE col1 < 5;
 ```
 
 ## Building
@@ -114,16 +133,24 @@ minidb/
 | `VARCHAR(n)` | Variable length string (max n chars) |
 | `BOOL` | Boolean (TRUE/FALSE) |
 
-## Limitations
+## Advanced Features
 
-This is an educational project with the following limitations:
+This database now includes several advanced features:
 
-- No multi-threading / concurrent access
-- No crash recovery / write-ahead logging
-- No query optimization (full table scans)
-- No JOINs (single table queries only)
-- No aggregate functions (COUNT, SUM, etc.)
-- B+ tree delete doesn't handle underflow
+- **Concurrency Control**: Lock manager with shared/exclusive locks, deadlock detection
+- **Write-Ahead Logging**: WAL for crash recovery and durability
+- **Query Optimizer**: Cost-based optimization with index scan detection
+- **JOINs**: INNER JOIN, LEFT JOIN, RIGHT JOIN support
+- **Aggregates**: COUNT, SUM, AVG, MIN, MAX with GROUP BY
+- **B+ Tree**: Full delete support with node merge/redistribute
+
+## Remaining Limitations
+
+- WAL recovery is basic (redo/undo not fully integrated with executor)
+- No transaction isolation levels (READ COMMITTED, SERIALIZABLE)
+- No subqueries
+- No HAVING clause full support
+- No CREATE INDEX (only automatic primary key index)
 
 ## License
 

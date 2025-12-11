@@ -8,7 +8,13 @@
 #include <optional>
 #include <variant>
 #include <unordered_map>
+#include <unordered_set>
+#include <map>
+#include <list>
+#include <functional>
 #include <stdexcept>
+#include <mutex>
+#include <shared_mutex>
 #include <iostream>
 #include <fstream>
 #include <sstream>

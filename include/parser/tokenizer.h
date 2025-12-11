@@ -13,6 +13,10 @@ enum class TokenType {
     TRUE_VAL, FALSE_VAL, NULL_VAL,
     ORDER, BY, ASC, DESC, LIMIT, OFFSET,
     JOIN, ON, LEFT, RIGHT, INNER, OUTER,
+    GROUP, HAVING, AS, DISTINCT,
+    
+    // Aggregate functions
+    COUNT, SUM, AVG, MIN, MAX,
     
     // Operators
     EQUAL, NOT_EQUAL, LESS, GREATER, LESS_EQUAL, GREATER_EQUAL,

@@ -11,6 +11,9 @@ set(SOURCES
     src/storage/page.cpp
     src/storage/file_manager.cpp
     src/storage/buffer_pool.cpp
+    src/storage/wal.cpp
+    src/concurrency/lock_manager.cpp
+    src/optimizer/query_optimizer.cpp
     src/index/btree.cpp
     src/parser/tokenizer.cpp
     src/parser/parser.cpp

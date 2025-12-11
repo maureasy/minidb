@@ -15,7 +15,16 @@ enum class ExprType {
     COLUMN_REF,
     BINARY_OP,
     UNARY_OP,
-    FUNCTION_CALL
+    AGGREGATE_FUNC
+};
+
+// Aggregate function types
+enum class AggregateType {
+    COUNT,
+    SUM,
+    AVG,
+    MIN,
+    MAX
 };
 
 // Binary operators
@@ -50,7 +59,34 @@ struct Expression {
     UnaryOp unary_op;
     std::unique_ptr<Expression> operand;
     
+    // For AGGREGATE_FUNC
+    AggregateType aggregate_type;
+    std::unique_ptr<Expression> aggregate_arg;  // nullptr for COUNT(*)
+    bool is_distinct = false;
+    
     Expression() : type(ExprType::LITERAL) {}
+};
+
+// Join type
+enum class JoinType {
+    INNER,
+    LEFT,
+    RIGHT
+};
+
+// Join clause
+struct JoinClause {
+    JoinType type;
+    std::string table_name;
+    std::string alias;
+    std::unique_ptr<Expression> on_condition;
+};
+
+// Select column (can be expression, column ref, or aggregate)
+struct SelectColumn {
+    std::unique_ptr<Expression> expr;
+    std::string alias;
+    bool is_star = false;  // SELECT *
 };
 
 // Column definition for CREATE TABLE
@@ -74,9 +110,15 @@ enum class StatementType {
 
 // SELECT statement
 struct SelectStatement {
-    std::vector<std::string> columns;  // Empty means SELECT *
+    std::vector<SelectColumn> select_columns;  // What to select
+    bool select_all = false;  // SELECT *
+    bool is_distinct = false;
     std::string table_name;
+    std::string table_alias;
+    std::vector<JoinClause> joins;
     std::unique_ptr<Expression> where_clause;
+    std::vector<std::string> group_by;
+    std::unique_ptr<Expression> having_clause;
     std::vector<std::pair<std::string, bool>> order_by;  // column, is_ascending
     int limit = -1;
     int offset = 0;
@@ -171,6 +213,9 @@ private:
     Value parseValue();
     ColumnDef parseColumnDef();
     std::vector<std::string> parseColumnList();
+    SelectColumn parseSelectColumn();
+    JoinClause parseJoinClause();
+    std::unique_ptr<Expression> parseAggregate();
     
     // Error handling
     void setError(const std::string& message);

@@ -77,17 +77,19 @@ std::unique_ptr<Statement> Parser::parseStatement() {
 std::unique_ptr<SelectStatement> Parser::parseSelect() {
     auto stmt = std::make_unique<SelectStatement>();
     
+    // Check for DISTINCT
+    if (match(TokenType::DISTINCT)) {
+        stmt->is_distinct = true;
+    }
+    
     // Parse column list
     if (match(TokenType::STAR)) {
-        // SELECT * - empty columns means all
+        stmt->select_all = true;
     } else {
         do {
-            if (!check(TokenType::IDENTIFIER)) {
-                setError("Expected column name");
-                return nullptr;
-            }
-            stmt->columns.push_back(current_token_.value);
-            advance();
+            SelectColumn col = parseSelectColumn();
+            if (hasError()) return nullptr;
+            stmt->select_columns.push_back(std::move(col));
         } while (match(TokenType::COMMA));
     }
     
@@ -102,9 +104,54 @@ std::unique_ptr<SelectStatement> Parser::parseSelect() {
     stmt->table_name = current_token_.value;
     advance();
     
+    // Optional table alias
+    if (match(TokenType::AS)) {
+        if (!check(TokenType::IDENTIFIER)) {
+            setError("Expected alias after AS");
+            return nullptr;
+        }
+        stmt->table_alias = current_token_.value;
+        advance();
+    } else if (check(TokenType::IDENTIFIER) && 
+               !check(TokenType::WHERE) && !check(TokenType::JOIN) &&
+               !check(TokenType::LEFT) && !check(TokenType::RIGHT) &&
+               !check(TokenType::INNER) && !check(TokenType::ORDER) &&
+               !check(TokenType::GROUP) && !check(TokenType::LIMIT)) {
+        stmt->table_alias = current_token_.value;
+        advance();
+    }
+    
+    // Optional JOINs
+    while (check(TokenType::JOIN) || check(TokenType::LEFT) || 
+           check(TokenType::RIGHT) || check(TokenType::INNER)) {
+        JoinClause join = parseJoinClause();
+        if (hasError()) return nullptr;
+        stmt->joins.push_back(std::move(join));
+    }
+    
     // Optional WHERE clause
     if (match(TokenType::WHERE)) {
         stmt->where_clause = parseExpression();
+    }
+    
+    // Optional GROUP BY
+    if (match(TokenType::GROUP)) {
+        expect(TokenType::BY, "Expected BY after GROUP");
+        if (hasError()) return nullptr;
+        
+        do {
+            if (!check(TokenType::IDENTIFIER)) {
+                setError("Expected column name in GROUP BY");
+                return nullptr;
+            }
+            stmt->group_by.push_back(current_token_.value);
+            advance();
+        } while (match(TokenType::COMMA));
+    }
+    
+    // Optional HAVING
+    if (match(TokenType::HAVING)) {
+        stmt->having_clause = parseExpression();
     }
     
     // Optional ORDER BY
@@ -152,6 +199,115 @@ std::unique_ptr<SelectStatement> Parser::parseSelect() {
     }
     
     return stmt;
+}
+
+SelectColumn Parser::parseSelectColumn() {
+    SelectColumn col;
+    
+    // Check for aggregate functions
+    if (check(TokenType::COUNT) || check(TokenType::SUM) || 
+        check(TokenType::AVG) || check(TokenType::MIN) || check(TokenType::MAX)) {
+        col.expr = parseAggregate();
+    } else {
+        col.expr = parseExpression();
+    }
+    
+    // Optional alias
+    if (match(TokenType::AS)) {
+        if (!check(TokenType::IDENTIFIER)) {
+            setError("Expected alias after AS");
+            return col;
+        }
+        col.alias = current_token_.value;
+        advance();
+    }
+    
+    return col;
+}
+
+JoinClause Parser::parseJoinClause() {
+    JoinClause join;
+    join.type = JoinType::INNER;  // Default
+    
+    // Determine join type
+    if (match(TokenType::LEFT)) {
+        join.type = JoinType::LEFT;
+        match(TokenType::OUTER);  // Optional OUTER
+    } else if (match(TokenType::RIGHT)) {
+        join.type = JoinType::RIGHT;
+        match(TokenType::OUTER);  // Optional OUTER
+    } else if (match(TokenType::INNER)) {
+        join.type = JoinType::INNER;
+    }
+    
+    expect(TokenType::JOIN, "Expected JOIN");
+    if (hasError()) return join;
+    
+    // Table name
+    if (!check(TokenType::IDENTIFIER)) {
+        setError("Expected table name after JOIN");
+        return join;
+    }
+    join.table_name = current_token_.value;
+    advance();
+    
+    // Optional alias
+    if (match(TokenType::AS)) {
+        if (!check(TokenType::IDENTIFIER)) {
+            setError("Expected alias after AS");
+            return join;
+        }
+        join.alias = current_token_.value;
+        advance();
+    } else if (check(TokenType::IDENTIFIER) && !check(TokenType::ON)) {
+        join.alias = current_token_.value;
+        advance();
+    }
+    
+    // ON condition
+    expect(TokenType::ON, "Expected ON after JOIN table");
+    if (hasError()) return join;
+    
+    join.on_condition = parseExpression();
+    
+    return join;
+}
+
+std::unique_ptr<Expression> Parser::parseAggregate() {
+    auto expr = std::make_unique<Expression>();
+    expr->type = ExprType::AGGREGATE_FUNC;
+    
+    // Get aggregate type
+    if (match(TokenType::COUNT)) {
+        expr->aggregate_type = AggregateType::COUNT;
+    } else if (match(TokenType::SUM)) {
+        expr->aggregate_type = AggregateType::SUM;
+    } else if (match(TokenType::AVG)) {
+        expr->aggregate_type = AggregateType::AVG;
+    } else if (match(TokenType::MIN)) {
+        expr->aggregate_type = AggregateType::MIN;
+    } else if (match(TokenType::MAX)) {
+        expr->aggregate_type = AggregateType::MAX;
+    }
+    
+    expect(TokenType::LPAREN, "Expected ( after aggregate function");
+    if (hasError()) return nullptr;
+    
+    // Check for DISTINCT
+    if (match(TokenType::DISTINCT)) {
+        expr->is_distinct = true;
+    }
+    
+    // Check for * (COUNT(*))
+    if (match(TokenType::STAR)) {
+        expr->aggregate_arg = nullptr;  // COUNT(*)
+    } else {
+        expr->aggregate_arg = parseExpression();
+    }
+    
+    expect(TokenType::RPAREN, "Expected ) after aggregate argument");
+    
+    return expr;
 }
 
 std::unique_ptr<InsertStatement> Parser::parseInsert() {

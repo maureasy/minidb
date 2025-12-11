@@ -71,6 +71,19 @@ private:
     
     Node* getLeftmostLeaf() const;
     void deleteTree(Node* node);
+    
+    // Delete helpers (underflow handling)
+    void deleteFromLeaf(Node* leaf, size_t pos);
+    void deleteFromInternal(Node* node, size_t pos);
+    void handleUnderflow(Node* node);
+    void borrowFromLeftSibling(Node* node, Node* left_sibling, Node* parent, size_t parent_idx);
+    void borrowFromRightSibling(Node* node, Node* right_sibling, Node* parent, size_t parent_idx);
+    void mergeWithLeftSibling(Node* node, Node* left_sibling, Node* parent, size_t parent_idx);
+    void mergeWithRightSibling(Node* node, Node* right_sibling, Node* parent, size_t parent_idx);
+    int getMinKeys() const { return (order_ - 1) / 2; }
+    Node* getLeftSibling(Node* node, Node* parent, size_t& parent_idx);
+    Node* getRightSibling(Node* node, Node* parent, size_t& parent_idx);
+    void updateParentKey(Node* parent, size_t idx, int64_t new_key);
 };
 
 } // namespace minidb

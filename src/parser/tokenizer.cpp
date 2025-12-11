@@ -163,6 +163,15 @@ TokenType Tokenizer::lookupKeyword(const std::string& identifier) {
     if (upper == "RIGHT") return TokenType::RIGHT;
     if (upper == "INNER") return TokenType::INNER;
     if (upper == "OUTER") return TokenType::OUTER;
+    if (upper == "GROUP") return TokenType::GROUP;
+    if (upper == "HAVING") return TokenType::HAVING;
+    if (upper == "AS") return TokenType::AS;
+    if (upper == "DISTINCT") return TokenType::DISTINCT;
+    if (upper == "COUNT") return TokenType::COUNT;
+    if (upper == "SUM") return TokenType::SUM;
+    if (upper == "AVG") return TokenType::AVG;
+    if (upper == "MIN") return TokenType::MIN;
+    if (upper == "MAX") return TokenType::MAX;
     
     return TokenType::IDENTIFIER;
 }
@@ -293,6 +302,15 @@ std::string tokenTypeName(TokenType type) {
         case TokenType::RIGHT: return "RIGHT";
         case TokenType::INNER: return "INNER";
         case TokenType::OUTER: return "OUTER";
+        case TokenType::GROUP: return "GROUP";
+        case TokenType::HAVING: return "HAVING";
+        case TokenType::AS: return "AS";
+        case TokenType::DISTINCT: return "DISTINCT";
+        case TokenType::COUNT: return "COUNT";
+        case TokenType::SUM: return "SUM";
+        case TokenType::AVG: return "AVG";
+        case TokenType::MIN: return "MIN";
+        case TokenType::MAX: return "MAX";
         case TokenType::EQUAL: return "EQUAL";
         case TokenType::NOT_EQUAL: return "NOT_EQUAL";
         case TokenType::LESS: return "LESS";
