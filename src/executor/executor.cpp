@@ -5,7 +5,8 @@ namespace minidb {
 Executor::Executor(Catalog& catalog, BufferPool& buffer_pool,
                    WalManager* wal, LockManager* lock_mgr)
     : catalog_(catalog), buffer_pool_(buffer_pool), 
-      wal_(wal), lock_mgr_(lock_mgr), current_txn_id_(INVALID_TXN_ID) {}
+      wal_(wal), lock_mgr_(lock_mgr), current_txn_id_(INVALID_TXN_ID),
+      optimizer_(std::make_unique<QueryOptimizer>(catalog)) {}
 
 QueryResult Executor::execute(const Statement& stmt) {
     switch (stmt.type) {
@@ -881,13 +882,18 @@ QueryResult Executor::executeSelect(const SelectStatement& stmt) {
     CombinedSchema combined_schema;
     std::vector<Row> all_rows;
     
+    // Use optimizer to create execution plan
+    auto plan = optimizer_->optimize(stmt);
+    
     // Handle JOINs
     if (!stmt.joins.empty()) {
         all_rows = executeJoin(stmt.table_name, stmt.joins, combined_schema);
     } else {
         combined_schema.table_names.push_back(stmt.table_name);
         combined_schema.schemas.push_back(schema);
-        all_rows = scanTable(stmt.table_name);
+        
+        // Execute based on plan type
+        all_rows = executePlan(plan.get(), stmt);
     }
     
     // Apply WHERE clause
@@ -1386,6 +1392,130 @@ QueryResult Executor::executeRollback() {
     current_txn_id_ = INVALID_TXN_ID;
     
     return result;
+}
+
+std::vector<Row> Executor::executePlan(const PlanNode* plan, const SelectStatement& stmt) {
+    if (!plan) {
+        return scanTable(stmt.table_name);
+    }
+    
+    // Find the leaf scan node (walk down through FILTER, PROJECTION, etc.)
+    const PlanNode* scan_node = plan;
+    while (scan_node && !scan_node->children.empty()) {
+        // Check if this is a scan node
+        if (scan_node->type == PlanNodeType::SEQ_SCAN || 
+            scan_node->type == PlanNodeType::INDEX_SCAN) {
+            break;
+        }
+        scan_node = scan_node->children[0].get();
+    }
+    
+    if (!scan_node) {
+        return scanTable(stmt.table_name);
+    }
+    
+    switch (scan_node->type) {
+        case PlanNodeType::INDEX_SCAN:
+            return executeIndexScan(scan_node);
+        case PlanNodeType::SEQ_SCAN:
+        default:
+            return executeSeqScan(scan_node);
+    }
+}
+
+std::vector<Row> Executor::executeSeqScan(const PlanNode* plan) {
+    if (!plan || plan->table_name.empty()) {
+        return {};
+    }
+    return scanTable(plan->table_name);
+}
+
+std::vector<Row> Executor::executeIndexScan(const PlanNode* plan) {
+    if (!plan || plan->table_name.empty()) {
+        return {};
+    }
+    
+    auto table_opt = catalog_.getTable(plan->table_name);
+    if (!table_opt) return {};
+    
+    const TableSchema& schema = table_opt.value();
+    
+    // Get the index
+    BTree* index = catalog_.getIndex(plan->table_name);
+    if (!index) {
+        // Fall back to sequential scan
+        return scanTable(plan->table_name);
+    }
+    
+    std::vector<Row> rows;
+    
+    // Use index to find matching records
+    if (plan->index_start.has_value()) {
+        auto record_opt = index->search(plan->index_start.value());
+        if (record_opt) {
+            RecordId rid = record_opt.value();
+            
+            // Fetch the page and record
+            Page* page = buffer_pool_.fetchPage(rid.page_id);
+            if (page) {
+                char buffer[PAGE_SIZE];
+                uint16_t length;
+                
+                if (page->getRecord(rid.slot_id, buffer, length)) {
+                    // Deserialize the row
+                    Row row;
+                    size_t offset = 0;
+                    
+                    for (size_t i = 0; i < schema.columns.size() && offset < length; i++) {
+                        uint8_t type_tag = static_cast<uint8_t>(buffer[offset++]);
+                        
+                        switch (type_tag) {
+                            case 0:  // NULL
+                                row.push_back(std::monostate{});
+                                break;
+                            case 1: {  // INT
+                                int64_t v;
+                                std::memcpy(&v, buffer + offset, sizeof(int64_t));
+                                offset += sizeof(int64_t);
+                                row.push_back(v);
+                                break;
+                            }
+                            case 2: {  // FLOAT
+                                double v;
+                                std::memcpy(&v, buffer + offset, sizeof(double));
+                                offset += sizeof(double);
+                                row.push_back(v);
+                                break;
+                            }
+                            case 3: {  // STRING
+                                uint16_t len;
+                                std::memcpy(&len, buffer + offset, sizeof(uint16_t));
+                                offset += sizeof(uint16_t);
+                                std::string s(buffer + offset, len);
+                                offset += len;
+                                row.push_back(s);
+                                break;
+                            }
+                            case 4: {  // BOOL
+                                uint8_t v = static_cast<uint8_t>(buffer[offset++]);
+                                row.push_back(v != 0);
+                                break;
+                            }
+                            default:
+                                row.push_back(std::monostate{});
+                                break;
+                        }
+                    }
+                    
+                    rows.push_back(std::move(row));
+                }
+                
+                buffer_pool_.unpinPage(rid.page_id, false);
+            }
+        }
+    }
+    
+    return rows;
 }
 
 } // namespace minidb

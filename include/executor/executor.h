@@ -7,6 +7,7 @@
 #include "storage/wal.h"
 #include "concurrency/lock_manager.h"
 #include "concurrency/transaction.h"
+#include "optimizer/query_optimizer.h"
 #include "index/btree.h"
 
 namespace minidb {
@@ -57,6 +58,12 @@ private:
     WalManager* wal_;
     LockManager* lock_mgr_;
     TxnId current_txn_id_ = INVALID_TXN_ID;
+    std::unique_ptr<QueryOptimizer> optimizer_;
+    
+    // Plan execution
+    std::vector<Row> executePlan(const PlanNode* plan, const SelectStatement& stmt);
+    std::vector<Row> executeSeqScan(const PlanNode* plan);
+    std::vector<Row> executeIndexScan(const PlanNode* plan);
     
     // Statement executors
     QueryResult executeSelect(const SelectStatement& stmt);
