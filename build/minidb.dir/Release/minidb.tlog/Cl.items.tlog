@@ -1,0 +1,9 @@
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\main.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\main.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\page.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\page.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\file_manager.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\file_manager.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\buffer_pool.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\buffer_pool.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\index\btree.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\btree.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\tokenizer.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\tokenizer.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\parser.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\parser.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\catalog\catalog.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\catalog.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\executor\executor.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\executor.obj

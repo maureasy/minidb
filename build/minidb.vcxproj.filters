@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\page.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\file_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\buffer_pool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\index\btree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\tokenizer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\catalog\catalog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\executor\executor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{E2A2C991-60C5-35D4-A7A4-C6C92B895DFD}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
