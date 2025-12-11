@@ -138,19 +138,38 @@ minidb/
 This database now includes several advanced features:
 
 - **Concurrency Control**: Lock manager with shared/exclusive locks, deadlock detection
-- **Write-Ahead Logging**: WAL for crash recovery and durability
+- **Write-Ahead Logging**: WAL for crash recovery and durability with transaction manager
 - **Query Optimizer**: Cost-based optimization with index scan detection
 - **JOINs**: INNER JOIN, LEFT JOIN, RIGHT JOIN support
-- **Aggregates**: COUNT, SUM, AVG, MIN, MAX with GROUP BY
+- **Aggregates**: COUNT, SUM, AVG, MIN, MAX with GROUP BY and HAVING
 - **B+ Tree**: Full delete support with node merge/redistribute
+- **Transaction Isolation**: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE
+- **CREATE INDEX**: Create custom indexes on any column
+- **Subqueries**: EXISTS subquery support
 
-## Remaining Limitations
+## Supported Index Operations
 
-- WAL recovery is basic (redo/undo not fully integrated with executor)
-- No transaction isolation levels (READ COMMITTED, SERIALIZABLE)
-- No subqueries
-- No HAVING clause full support
-- No CREATE INDEX (only automatic primary key index)
+```sql
+-- Create an index
+CREATE INDEX idx_name ON table_name (column1, column2);
+CREATE UNIQUE INDEX idx_unique ON table_name (column);
+
+-- Drop an index
+DROP INDEX idx_name;
+```
+
+## Transaction Support
+
+```sql
+-- Begin a transaction with isolation level
+BEGIN TRANSACTION;
+BEGIN TRANSACTION READ COMMITTED;
+BEGIN TRANSACTION SERIALIZABLE;
+
+-- Commit or rollback
+COMMIT;
+ROLLBACK;
+```
 
 ## License
 

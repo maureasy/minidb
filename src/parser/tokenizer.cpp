@@ -172,6 +172,20 @@ TokenType Tokenizer::lookupKeyword(const std::string& identifier) {
     if (upper == "AVG") return TokenType::AVG;
     if (upper == "MIN") return TokenType::MIN;
     if (upper == "MAX") return TokenType::MAX;
+    if (upper == "INDEX") return TokenType::INDEX;
+    if (upper == "UNIQUE") return TokenType::UNIQUE;
+    if (upper == "BEGIN") return TokenType::BEGIN;
+    if (upper == "COMMIT") return TokenType::COMMIT;
+    if (upper == "ROLLBACK") return TokenType::ROLLBACK;
+    if (upper == "TRANSACTION") return TokenType::TRANSACTION;
+    if (upper == "IN") return TokenType::IN;
+    if (upper == "EXISTS") return TokenType::EXISTS;
+    if (upper == "BETWEEN") return TokenType::BETWEEN;
+    if (upper == "READ") return TokenType::READ;
+    if (upper == "COMMITTED") return TokenType::COMMITTED;
+    if (upper == "UNCOMMITTED") return TokenType::UNCOMMITTED;
+    if (upper == "REPEATABLE") return TokenType::REPEATABLE;
+    if (upper == "SERIALIZABLE") return TokenType::SERIALIZABLE;
     
     return TokenType::IDENTIFIER;
 }
@@ -311,6 +325,20 @@ std::string tokenTypeName(TokenType type) {
         case TokenType::AVG: return "AVG";
         case TokenType::MIN: return "MIN";
         case TokenType::MAX: return "MAX";
+        case TokenType::INDEX: return "INDEX";
+        case TokenType::UNIQUE: return "UNIQUE";
+        case TokenType::BEGIN: return "BEGIN";
+        case TokenType::COMMIT: return "COMMIT";
+        case TokenType::ROLLBACK: return "ROLLBACK";
+        case TokenType::TRANSACTION: return "TRANSACTION";
+        case TokenType::IN: return "IN";
+        case TokenType::EXISTS: return "EXISTS";
+        case TokenType::BETWEEN: return "BETWEEN";
+        case TokenType::READ: return "READ";
+        case TokenType::COMMITTED: return "COMMITTED";
+        case TokenType::UNCOMMITTED: return "UNCOMMITTED";
+        case TokenType::REPEATABLE: return "REPEATABLE";
+        case TokenType::SERIALIZABLE: return "SERIALIZABLE";
         case TokenType::EQUAL: return "EQUAL";
         case TokenType::NOT_EQUAL: return "NOT_EQUAL";
         case TokenType::LESS: return "LESS";

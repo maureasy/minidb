@@ -15,6 +15,15 @@ struct ColumnInfo {
     ColumnId id;
 };
 
+// Index information
+struct IndexInfo {
+    std::string name;
+    std::string table_name;
+    std::vector<std::string> columns;
+    bool is_unique;
+    bool is_primary;
+};
+
 // Table schema
 struct TableSchema {
     TableId id;
@@ -62,7 +71,14 @@ public:
     
     // Index management
     BTree* getIndex(const std::string& table_name);
+    BTree* getIndexByName(const std::string& index_name);
     void createIndex(const std::string& table_name);
+    bool createNamedIndex(const std::string& index_name, const std::string& table_name,
+                          const std::vector<std::string>& columns, bool is_unique);
+    bool dropIndex(const std::string& index_name);
+    bool indexExists(const std::string& index_name) const;
+    std::vector<IndexInfo> getIndexesForTable(const std::string& table_name) const;
+    std::vector<std::string> getIndexNames() const;
     
     // Persistence
     void save(const std::string& path);
@@ -71,6 +87,7 @@ public:
 private:
     std::unordered_map<std::string, TableSchema> tables_;
     std::unordered_map<std::string, std::unique_ptr<BTree>> indexes_;
+    std::unordered_map<std::string, IndexInfo> index_info_;
     TableId next_table_id_ = 1;
 };
 

@@ -19,6 +19,18 @@ QueryResult Executor::execute(const Statement& stmt) {
             return executeCreateTable(*stmt.create_table);
         case StatementType::DROP_TABLE:
             return executeDropTable(*stmt.drop_table);
+        case StatementType::CREATE_INDEX:
+            return executeCreateIndex(*stmt.create_index);
+        case StatementType::DROP_INDEX:
+            return executeDropIndex(*stmt.drop_index);
+        case StatementType::BEGIN_TXN:
+        case StatementType::COMMIT_TXN:
+        case StatementType::ROLLBACK_TXN: {
+            QueryResult result;
+            result.success = true;
+            result.message = "Transaction command acknowledged";
+            return result;
+        }
         default:
             QueryResult result;
             result.error_message = "Unknown statement type";
@@ -1191,6 +1203,70 @@ QueryResult Executor::executeDropTable(const DropTableStatement& stmt) {
     
     result.success = true;
     result.message = "Table dropped: " + stmt.table_name;
+    return result;
+}
+
+QueryResult Executor::executeCreateIndex(const CreateIndexStatement& stmt) {
+    QueryResult result;
+    
+    if (catalog_.indexExists(stmt.index_name)) {
+        result.error_message = "Index already exists: " + stmt.index_name;
+        return result;
+    }
+    
+    if (!catalog_.tableExists(stmt.table_name)) {
+        result.error_message = "Table not found: " + stmt.table_name;
+        return result;
+    }
+    
+    if (!catalog_.createNamedIndex(stmt.index_name, stmt.table_name, stmt.columns, stmt.is_unique)) {
+        result.error_message = "Failed to create index";
+        return result;
+    }
+    
+    // Build the index by scanning existing data
+    auto table_opt = catalog_.getTable(stmt.table_name);
+    if (table_opt && !stmt.columns.empty()) {
+        BTree* index = catalog_.getIndexByName(stmt.index_name);
+        if (index) {
+            int col_idx = table_opt->getColumnIndex(stmt.columns[0]);
+            if (col_idx >= 0) {
+                std::vector<Row> rows = scanTable(stmt.table_name);
+                for (size_t i = 0; i < rows.size(); i++) {
+                    if (col_idx < static_cast<int>(rows[i].size())) {
+                        const Value& val = rows[i][col_idx];
+                        if (std::holds_alternative<int64_t>(val)) {
+                            RecordId rid;
+                            rid.page_id = static_cast<PageId>(i / 100);
+                            rid.slot_id = static_cast<SlotId>(i % 100);
+                            index->insert(std::get<int64_t>(val), rid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    result.success = true;
+    result.message = "Index created: " + stmt.index_name;
+    return result;
+}
+
+QueryResult Executor::executeDropIndex(const DropIndexStatement& stmt) {
+    QueryResult result;
+    
+    if (!catalog_.indexExists(stmt.index_name)) {
+        result.error_message = "Index not found: " + stmt.index_name;
+        return result;
+    }
+    
+    if (!catalog_.dropIndex(stmt.index_name)) {
+        result.error_message = "Failed to drop index";
+        return result;
+    }
+    
+    result.success = true;
+    result.message = "Index dropped: " + stmt.index_name;
     return result;
 }
 

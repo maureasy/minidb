@@ -13,6 +13,7 @@ set(SOURCES
     src/storage/buffer_pool.cpp
     src/storage/wal.cpp
     src/concurrency/lock_manager.cpp
+    src/concurrency/transaction.cpp
     src/optimizer/query_optimizer.cpp
     src/index/btree.cpp
     src/parser/tokenizer.cpp

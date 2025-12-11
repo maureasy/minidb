@@ -2,6 +2,10 @@ C:\Users\maure\Documents\Development\Charlie_project\minidb\src\main.cpp;C:\User
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\page.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\page.obj
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\file_manager.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\file_manager.obj
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\buffer_pool.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\buffer_pool.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\wal.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\wal.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\concurrency\lock_manager.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\lock_manager.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\concurrency\transaction.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\transaction.obj
+C:\Users\maure\Documents\Development\Charlie_project\minidb\src\optimizer\query_optimizer.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\query_optimizer.obj
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\index\btree.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\btree.obj
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\tokenizer.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\tokenizer.obj
 C:\Users\maure\Documents\Development\Charlie_project\minidb\src\parser\parser.cpp;C:\Users\maure\Documents\Development\Charlie_project\minidb\build\minidb.dir\Release\parser.obj

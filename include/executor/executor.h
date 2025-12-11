@@ -4,6 +4,7 @@
 #include "parser/parser.h"
 #include "catalog/catalog.h"
 #include "storage/buffer_pool.h"
+#include "index/btree.h"
 
 namespace minidb {
 
@@ -52,6 +53,8 @@ private:
     QueryResult executeDelete(const DeleteStatement& stmt);
     QueryResult executeCreateTable(const CreateTableStatement& stmt);
     QueryResult executeDropTable(const DropTableStatement& stmt);
+    QueryResult executeCreateIndex(const CreateIndexStatement& stmt);
+    QueryResult executeDropIndex(const DropIndexStatement& stmt);
     
     // Row operations
     std::vector<Row> scanTable(const std::string& table_name);

@@ -15,7 +15,10 @@ enum class ExprType {
     COLUMN_REF,
     BINARY_OP,
     UNARY_OP,
-    AGGREGATE_FUNC
+    AGGREGATE_FUNC,
+    SUBQUERY,        // For subqueries
+    IN_LIST,         // For IN (value1, value2, ...)
+    EXISTS           // For EXISTS (subquery)
 };
 
 // Aggregate function types
@@ -64,6 +67,12 @@ struct Expression {
     std::unique_ptr<Expression> aggregate_arg;  // nullptr for COUNT(*)
     bool is_distinct = false;
     
+    // For SUBQUERY
+    std::unique_ptr<struct SelectStatement> subquery;
+    
+    // For IN_LIST
+    std::vector<Value> in_values;
+    
     Expression() : type(ExprType::LITERAL) {}
 };
 
@@ -105,7 +114,12 @@ enum class StatementType {
     UPDATE,
     DELETE,
     CREATE_TABLE,
-    DROP_TABLE
+    DROP_TABLE,
+    CREATE_INDEX,
+    DROP_INDEX,
+    BEGIN_TXN,
+    COMMIT_TXN,
+    ROLLBACK_TXN
 };
 
 // SELECT statement
@@ -155,6 +169,28 @@ struct DropTableStatement {
     std::string table_name;
 };
 
+// CREATE INDEX statement
+struct CreateIndexStatement {
+    std::string index_name;
+    std::string table_name;
+    std::vector<std::string> columns;
+    bool is_unique = false;
+};
+
+// DROP INDEX statement
+struct DropIndexStatement {
+    std::string index_name;
+    std::string table_name;  // Optional: ON table_name
+};
+
+// Transaction statements
+struct BeginStatement {
+    std::string isolation_level;  // Optional: READ COMMITTED, SERIALIZABLE, etc.
+};
+
+struct CommitStatement {};
+struct RollbackStatement {};
+
 // Generic statement wrapper
 struct Statement {
     StatementType type;
@@ -164,6 +200,11 @@ struct Statement {
     std::unique_ptr<DeleteStatement> delete_stmt;
     std::unique_ptr<CreateTableStatement> create_table;
     std::unique_ptr<DropTableStatement> drop_table;
+    std::unique_ptr<CreateIndexStatement> create_index;
+    std::unique_ptr<DropIndexStatement> drop_index;
+    std::unique_ptr<BeginStatement> begin_txn;
+    std::unique_ptr<CommitStatement> commit_txn;
+    std::unique_ptr<RollbackStatement> rollback_txn;
 };
 
 // Recursive descent SQL parser
@@ -197,6 +238,11 @@ private:
     std::unique_ptr<DeleteStatement> parseDelete();
     std::unique_ptr<CreateTableStatement> parseCreateTable();
     std::unique_ptr<DropTableStatement> parseDropTable();
+    std::unique_ptr<CreateIndexStatement> parseCreateIndex();
+    std::unique_ptr<DropIndexStatement> parseDropIndex();
+    std::unique_ptr<BeginStatement> parseBegin();
+    std::unique_ptr<CommitStatement> parseCommit();
+    std::unique_ptr<RollbackStatement> parseRollback();
     
     // Expression parser (precedence climbing)
     std::unique_ptr<Expression> parseExpression();

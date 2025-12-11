@@ -55,15 +55,41 @@ std::unique_ptr<Statement> Parser::parseStatement() {
         stmt->type = StatementType::DELETE;
         stmt->delete_stmt = parseDelete();
     } else if (match(TokenType::CREATE)) {
-        expect(TokenType::TABLE, "Expected TABLE after CREATE");
-        stmt->type = StatementType::CREATE_TABLE;
-        stmt->create_table = parseCreateTable();
+        if (match(TokenType::TABLE)) {
+            stmt->type = StatementType::CREATE_TABLE;
+            stmt->create_table = parseCreateTable();
+        } else if (match(TokenType::INDEX) || match(TokenType::UNIQUE)) {
+            bool is_unique = (current_token_.type == TokenType::UNIQUE);
+            if (is_unique) match(TokenType::INDEX);
+            stmt->type = StatementType::CREATE_INDEX;
+            stmt->create_index = parseCreateIndex();
+            if (stmt->create_index) stmt->create_index->is_unique = is_unique;
+        } else {
+            setError("Expected TABLE or INDEX after CREATE");
+            return nullptr;
+        }
     } else if (match(TokenType::DROP)) {
-        expect(TokenType::TABLE, "Expected TABLE after DROP");
-        stmt->type = StatementType::DROP_TABLE;
-        stmt->drop_table = parseDropTable();
+        if (match(TokenType::TABLE)) {
+            stmt->type = StatementType::DROP_TABLE;
+            stmt->drop_table = parseDropTable();
+        } else if (match(TokenType::INDEX)) {
+            stmt->type = StatementType::DROP_INDEX;
+            stmt->drop_index = parseDropIndex();
+        } else {
+            setError("Expected TABLE or INDEX after DROP");
+            return nullptr;
+        }
+    } else if (match(TokenType::BEGIN)) {
+        stmt->type = StatementType::BEGIN_TXN;
+        stmt->begin_txn = parseBegin();
+    } else if (match(TokenType::COMMIT)) {
+        stmt->type = StatementType::COMMIT_TXN;
+        stmt->commit_txn = parseCommit();
+    } else if (match(TokenType::ROLLBACK)) {
+        stmt->type = StatementType::ROLLBACK_TXN;
+        stmt->rollback_txn = parseRollback();
     } else {
-        setError("Expected SELECT, INSERT, UPDATE, DELETE, CREATE, or DROP");
+        setError("Expected SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, BEGIN, COMMIT, or ROLLBACK");
         return nullptr;
     }
     
@@ -763,8 +789,129 @@ std::unique_ptr<Expression> Parser::parsePrimary() {
         return expr;
     }
     
+    // Check for EXISTS (subquery)
+    if (match(TokenType::EXISTS)) {
+        expr->type = ExprType::EXISTS;
+        expect(TokenType::LPAREN, "Expected ( after EXISTS");
+        if (hasError()) return nullptr;
+        
+        expect(TokenType::SELECT, "Expected SELECT in subquery");
+        if (hasError()) return nullptr;
+        
+        expr->subquery = parseSelect();
+        expect(TokenType::RPAREN, "Expected ) after subquery");
+        return expr;
+    }
+    
     setError("Expected expression");
     return nullptr;
+}
+
+// CREATE INDEX index_name ON table_name (column1, column2, ...)
+std::unique_ptr<CreateIndexStatement> Parser::parseCreateIndex() {
+    auto stmt = std::make_unique<CreateIndexStatement>();
+    
+    // Index name
+    if (!check(TokenType::IDENTIFIER)) {
+        setError("Expected index name");
+        return nullptr;
+    }
+    stmt->index_name = current_token_.value;
+    advance();
+    
+    // ON keyword
+    expect(TokenType::ON, "Expected ON after index name");
+    if (hasError()) return nullptr;
+    
+    // Table name
+    if (!check(TokenType::IDENTIFIER)) {
+        setError("Expected table name");
+        return nullptr;
+    }
+    stmt->table_name = current_token_.value;
+    advance();
+    
+    // Column list
+    expect(TokenType::LPAREN, "Expected ( after table name");
+    if (hasError()) return nullptr;
+    
+    do {
+        if (!check(TokenType::IDENTIFIER)) {
+            setError("Expected column name");
+            return nullptr;
+        }
+        stmt->columns.push_back(current_token_.value);
+        advance();
+    } while (match(TokenType::COMMA));
+    
+    expect(TokenType::RPAREN, "Expected ) after column list");
+    
+    return stmt;
+}
+
+// DROP INDEX index_name [ON table_name]
+std::unique_ptr<DropIndexStatement> Parser::parseDropIndex() {
+    auto stmt = std::make_unique<DropIndexStatement>();
+    
+    // Index name
+    if (!check(TokenType::IDENTIFIER)) {
+        setError("Expected index name");
+        return nullptr;
+    }
+    stmt->index_name = current_token_.value;
+    advance();
+    
+    // Optional ON table_name
+    if (match(TokenType::ON)) {
+        if (!check(TokenType::IDENTIFIER)) {
+            setError("Expected table name after ON");
+            return nullptr;
+        }
+        stmt->table_name = current_token_.value;
+        advance();
+    }
+    
+    return stmt;
+}
+
+// BEGIN [TRANSACTION] [isolation_level]
+std::unique_ptr<BeginStatement> Parser::parseBegin() {
+    auto stmt = std::make_unique<BeginStatement>();
+    
+    // Optional TRANSACTION keyword
+    match(TokenType::TRANSACTION);
+    
+    // Optional isolation level
+    if (match(TokenType::READ)) {
+        if (match(TokenType::COMMITTED)) {
+            stmt->isolation_level = "READ COMMITTED";
+        } else if (match(TokenType::UNCOMMITTED)) {
+            stmt->isolation_level = "READ UNCOMMITTED";
+        } else {
+            setError("Expected COMMITTED or UNCOMMITTED after READ");
+        }
+    } else if (match(TokenType::REPEATABLE)) {
+        expect(TokenType::READ, "Expected READ after REPEATABLE");
+        stmt->isolation_level = "REPEATABLE READ";
+    } else if (match(TokenType::SERIALIZABLE)) {
+        stmt->isolation_level = "SERIALIZABLE";
+    }
+    
+    return stmt;
+}
+
+// COMMIT [TRANSACTION]
+std::unique_ptr<CommitStatement> Parser::parseCommit() {
+    auto stmt = std::make_unique<CommitStatement>();
+    match(TokenType::TRANSACTION);  // Optional
+    return stmt;
+}
+
+// ROLLBACK [TRANSACTION]
+std::unique_ptr<RollbackStatement> Parser::parseRollback() {
+    auto stmt = std::make_unique<RollbackStatement>();
+    match(TokenType::TRANSACTION);  // Optional
+    return stmt;
 }
 
 } // namespace minidb

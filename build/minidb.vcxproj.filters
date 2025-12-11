@@ -13,6 +13,18 @@
     <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\buffer_pool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\storage\wal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\concurrency\lock_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\concurrency\transaction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\optimizer\query_optimizer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\src\index\btree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

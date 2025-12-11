@@ -89,10 +89,87 @@ BTree* Catalog::getIndex(const std::string& table_name) {
     return it->second.get();
 }
 
+BTree* Catalog::getIndexByName(const std::string& index_name) {
+    auto it = indexes_.find(index_name);
+    if (it == indexes_.end()) {
+        return nullptr;
+    }
+    return it->second.get();
+}
+
 void Catalog::createIndex(const std::string& table_name) {
     if (indexes_.find(table_name) == indexes_.end()) {
         indexes_[table_name] = std::make_unique<BTree>();
     }
+}
+
+bool Catalog::createNamedIndex(const std::string& index_name, const std::string& table_name,
+                                const std::vector<std::string>& columns, bool is_unique) {
+    if (indexExists(index_name)) {
+        return false;
+    }
+    
+    if (!tableExists(table_name)) {
+        return false;
+    }
+    
+    // Verify all columns exist
+    auto table_opt = getTable(table_name);
+    if (!table_opt) return false;
+    
+    for (const auto& col_name : columns) {
+        if (table_opt->getColumnIndex(col_name) < 0) {
+            return false;
+        }
+    }
+    
+    // Create the index
+    indexes_[index_name] = std::make_unique<BTree>();
+    
+    // Store index info
+    IndexInfo info;
+    info.name = index_name;
+    info.table_name = table_name;
+    info.columns = columns;
+    info.is_unique = is_unique;
+    info.is_primary = false;
+    index_info_[index_name] = info;
+    
+    return true;
+}
+
+bool Catalog::dropIndex(const std::string& index_name) {
+    auto it = indexes_.find(index_name);
+    if (it == indexes_.end()) {
+        return false;
+    }
+    
+    indexes_.erase(it);
+    index_info_.erase(index_name);
+    return true;
+}
+
+bool Catalog::indexExists(const std::string& index_name) const {
+    return indexes_.find(index_name) != indexes_.end() ||
+           index_info_.find(index_name) != index_info_.end();
+}
+
+std::vector<IndexInfo> Catalog::getIndexesForTable(const std::string& table_name) const {
+    std::vector<IndexInfo> result;
+    for (const auto& [name, info] : index_info_) {
+        if (info.table_name == table_name) {
+            result.push_back(info);
+        }
+    }
+    return result;
+}
+
+std::vector<std::string> Catalog::getIndexNames() const {
+    std::vector<std::string> names;
+    for (const auto& [name, info] : index_info_) {
+        names.push_back(name);
+    }
+    return names;
 }
 
 void Catalog::save(const std::string& path) {
