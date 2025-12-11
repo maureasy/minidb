@@ -35,6 +35,9 @@ private:
     FileManager& file_manager_;
     size_t pool_size_;
     
+    // Thread safety
+    mutable std::mutex mutex_;
+    
     // Page storage
     std::vector<Page> pages_;
     

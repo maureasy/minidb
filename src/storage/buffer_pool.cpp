@@ -18,6 +18,8 @@ BufferPool::~BufferPool() {
 }
 
 Page* BufferPool::fetchPage(PageId page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     // Check if page is already in buffer pool
     auto it = page_table_.find(page_id);
     if (it != page_table_.end()) {
@@ -60,6 +62,8 @@ Page* BufferPool::fetchPage(PageId page_id) {
 }
 
 Page* BufferPool::newPage(PageId& page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     // Allocate a new page on disk
     page_id = file_manager_.allocatePage();
     
@@ -93,6 +97,8 @@ Page* BufferPool::newPage(PageId& page_id) {
 }
 
 bool BufferPool::unpinPage(PageId page_id, bool is_dirty) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     auto it = page_table_.find(page_id);
     if (it == page_table_.end()) {
         return false;
@@ -109,6 +115,8 @@ bool BufferPool::unpinPage(PageId page_id, bool is_dirty) {
 }
 
 bool BufferPool::flushPage(PageId page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     auto it = page_table_.find(page_id);
     if (it == page_table_.end()) {
         return false;
@@ -122,6 +130,8 @@ bool BufferPool::flushPage(PageId page_id) {
 }
 
 void BufferPool::flushAllPages() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     for (auto& [page_id, frame_id] : page_table_) {
         if (pages_[frame_id].isDirty()) {
             file_manager_.writePage(page_id, pages_[frame_id]);
@@ -132,6 +142,8 @@ void BufferPool::flushAllPages() {
 }
 
 bool BufferPool::deletePage(PageId page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
     auto it = page_table_.find(page_id);
     if (it != page_table_.end()) {
         size_t frame_id = it->second;

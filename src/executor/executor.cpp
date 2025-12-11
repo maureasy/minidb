@@ -221,6 +221,12 @@ bool Executor::insertRow(const std::string& table_name, const Row& row) {
     bool success = page->insertRecord(data.c_str(), static_cast<uint16_t>(data.length()), slot_id);
     
     if (success) {
+        // Log to WAL for crash recovery
+        if (wal_ && current_txn_id_ != INVALID_TXN_ID) {
+            wal_->logInsert(current_txn_id_, page_id, slot_id, 
+                           data.c_str(), static_cast<uint16_t>(data.length()));
+        }
+        
         catalog_.updateRowCount(table_name, 1);
         
         // Update index if there's a primary key
@@ -1134,8 +1140,14 @@ QueryResult Executor::executeUpdate(const UpdateStatement& stmt) {
                     }
                     
                     // Serialize and update
-                    std::string data = serializeRow(row, schema);
-                    if (page->updateRecord(slot, data.c_str(), static_cast<uint16_t>(data.length()))) {
+                    std::string new_data = serializeRow(row, schema);
+                    if (page->updateRecord(slot, new_data.c_str(), static_cast<uint16_t>(new_data.length()))) {
+                        // Log to WAL for crash recovery
+                        if (wal_ && current_txn_id_ != INVALID_TXN_ID) {
+                            wal_->logUpdate(current_txn_id_, current_page_id, slot,
+                                           buffer, length,
+                                           new_data.c_str(), static_cast<uint16_t>(new_data.length()));
+                        }
                         result.rows_affected++;
                         page_modified = true;
                     }
@@ -1187,6 +1199,11 @@ QueryResult Executor::executeDelete(const DeleteStatement& stmt) {
                 
                 if (matchesWhere(stmt.where_clause.get(), row, schema)) {
                     if (page->deleteRecord(slot)) {
+                        // Log to WAL for crash recovery
+                        if (wal_ && current_txn_id_ != INVALID_TXN_ID) {
+                            wal_->logDelete(current_txn_id_, current_page_id, slot,
+                                           buffer, length);
+                        }
                         result.rows_affected++;
                         page_modified = true;
                         catalog_.updateRowCount(stmt.table_name, -1);
