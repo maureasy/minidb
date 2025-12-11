@@ -437,36 +437,53 @@ Value Executor::evaluateExpressionCombined(const Expression* expr, const Row& ro
             Value right = evaluateExpressionCombined(expr->right.get(), row, schema);
             
             switch (expr->binary_op) {
-                case BinaryOp::EQ: return left == right;
-                case BinaryOp::NE: return left != right;
-                case BinaryOp::LT:
-                    if (std::holds_alternative<int64_t>(left) && std::holds_alternative<int64_t>(right))
-                        return std::get<int64_t>(left) < std::get<int64_t>(right);
-                    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
-                        return std::get<double>(left) < std::get<double>(right);
+                case BinaryOp::EQ: return static_cast<bool>(left == right);
+                case BinaryOp::NE: return static_cast<bool>(left != right);
+                case BinaryOp::LT: {
+                    // Handle numeric comparisons with type coercion
+                    double l_val = 0, r_val = 0;
+                    bool l_num = false, r_num = false;
+                    if (std::holds_alternative<int64_t>(left)) { l_val = static_cast<double>(std::get<int64_t>(left)); l_num = true; }
+                    else if (std::holds_alternative<double>(left)) { l_val = std::get<double>(left); l_num = true; }
+                    if (std::holds_alternative<int64_t>(right)) { r_val = static_cast<double>(std::get<int64_t>(right)); r_num = true; }
+                    else if (std::holds_alternative<double>(right)) { r_val = std::get<double>(right); r_num = true; }
+                    if (l_num && r_num) return l_val < r_val;
                     if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right))
                         return std::get<std::string>(left) < std::get<std::string>(right);
                     return false;
-                case BinaryOp::GT:
-                    if (std::holds_alternative<int64_t>(left) && std::holds_alternative<int64_t>(right))
-                        return std::get<int64_t>(left) > std::get<int64_t>(right);
-                    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
-                        return std::get<double>(left) > std::get<double>(right);
+                }
+                case BinaryOp::GT: {
+                    double l_val = 0, r_val = 0;
+                    bool l_num = false, r_num = false;
+                    if (std::holds_alternative<int64_t>(left)) { l_val = static_cast<double>(std::get<int64_t>(left)); l_num = true; }
+                    else if (std::holds_alternative<double>(left)) { l_val = std::get<double>(left); l_num = true; }
+                    if (std::holds_alternative<int64_t>(right)) { r_val = static_cast<double>(std::get<int64_t>(right)); r_num = true; }
+                    else if (std::holds_alternative<double>(right)) { r_val = std::get<double>(right); r_num = true; }
+                    if (l_num && r_num) return l_val > r_val;
                     if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right))
                         return std::get<std::string>(left) > std::get<std::string>(right);
                     return false;
-                case BinaryOp::LE:
-                    if (std::holds_alternative<int64_t>(left) && std::holds_alternative<int64_t>(right))
-                        return std::get<int64_t>(left) <= std::get<int64_t>(right);
-                    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
-                        return std::get<double>(left) <= std::get<double>(right);
+                }
+                case BinaryOp::LE: {
+                    double l_val = 0, r_val = 0;
+                    bool l_num = false, r_num = false;
+                    if (std::holds_alternative<int64_t>(left)) { l_val = static_cast<double>(std::get<int64_t>(left)); l_num = true; }
+                    else if (std::holds_alternative<double>(left)) { l_val = std::get<double>(left); l_num = true; }
+                    if (std::holds_alternative<int64_t>(right)) { r_val = static_cast<double>(std::get<int64_t>(right)); r_num = true; }
+                    else if (std::holds_alternative<double>(right)) { r_val = std::get<double>(right); r_num = true; }
+                    if (l_num && r_num) return l_val <= r_val;
                     return false;
-                case BinaryOp::GE:
-                    if (std::holds_alternative<int64_t>(left) && std::holds_alternative<int64_t>(right))
-                        return std::get<int64_t>(left) >= std::get<int64_t>(right);
-                    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right))
-                        return std::get<double>(left) >= std::get<double>(right);
+                }
+                case BinaryOp::GE: {
+                    double l_val = 0, r_val = 0;
+                    bool l_num = false, r_num = false;
+                    if (std::holds_alternative<int64_t>(left)) { l_val = static_cast<double>(std::get<int64_t>(left)); l_num = true; }
+                    else if (std::holds_alternative<double>(left)) { l_val = std::get<double>(left); l_num = true; }
+                    if (std::holds_alternative<int64_t>(right)) { r_val = static_cast<double>(std::get<int64_t>(right)); r_num = true; }
+                    else if (std::holds_alternative<double>(right)) { r_val = std::get<double>(right); r_num = true; }
+                    if (l_num && r_num) return l_val >= r_val;
                     return false;
+                }
                 case BinaryOp::AND:
                     return std::holds_alternative<bool>(left) && std::holds_alternative<bool>(right) &&
                            std::get<bool>(left) && std::get<bool>(right);
