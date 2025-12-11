@@ -2,8 +2,10 @@
 
 namespace minidb {
 
-Executor::Executor(Catalog& catalog, BufferPool& buffer_pool)
-    : catalog_(catalog), buffer_pool_(buffer_pool) {}
+Executor::Executor(Catalog& catalog, BufferPool& buffer_pool,
+                   WalManager* wal, LockManager* lock_mgr)
+    : catalog_(catalog), buffer_pool_(buffer_pool), 
+      wal_(wal), lock_mgr_(lock_mgr), current_txn_id_(INVALID_TXN_ID) {}
 
 QueryResult Executor::execute(const Statement& stmt) {
     switch (stmt.type) {
@@ -24,13 +26,11 @@ QueryResult Executor::execute(const Statement& stmt) {
         case StatementType::DROP_INDEX:
             return executeDropIndex(*stmt.drop_index);
         case StatementType::BEGIN_TXN:
+            return executeBegin(*stmt.begin_txn);
         case StatementType::COMMIT_TXN:
-        case StatementType::ROLLBACK_TXN: {
-            QueryResult result;
-            result.success = true;
-            result.message = "Transaction command acknowledged";
-            return result;
-        }
+            return executeCommit();
+        case StatementType::ROLLBACK_TXN:
+            return executeRollback();
         default:
             QueryResult result;
             result.error_message = "Unknown statement type";
@@ -534,6 +534,31 @@ Value Executor::evaluateExpressionCombined(const Expression* expr, const Row& ro
                     return std::monostate{};
             }
             break;
+        }
+        
+        case ExprType::EXISTS: {
+            // Execute subquery and check if any rows returned
+            if (expr->subquery) {
+                // Build a temporary result by executing the subquery
+                auto subquery_table = catalog_.getTable(expr->subquery->table_name);
+                if (!subquery_table) return false;
+                
+                std::vector<Row> subquery_rows = scanTable(expr->subquery->table_name);
+                
+                // Apply WHERE clause if present
+                if (expr->subquery->where_clause) {
+                    std::vector<Row> filtered;
+                    for (const auto& r : subquery_rows) {
+                        if (matchesWhere(expr->subquery->where_clause.get(), r, subquery_table.value())) {
+                            filtered.push_back(r);
+                        }
+                    }
+                    subquery_rows = std::move(filtered);
+                }
+                
+                return !subquery_rows.empty();
+            }
+            return false;
         }
         
         default:
@@ -1284,6 +1309,82 @@ QueryResult Executor::executeDropIndex(const DropIndexStatement& stmt) {
     
     result.success = true;
     result.message = "Index dropped: " + stmt.index_name;
+    return result;
+}
+
+QueryResult Executor::executeBegin(const BeginStatement& stmt) {
+    QueryResult result;
+    
+    if (current_txn_id_ != INVALID_TXN_ID) {
+        result.error_message = "Transaction already in progress";
+        return result;
+    }
+    
+    if (wal_) {
+        current_txn_id_ = wal_->beginTransaction();
+        result.success = true;
+        result.message = "Transaction started (ID: " + std::to_string(current_txn_id_) + ")";
+        if (!stmt.isolation_level.empty()) {
+            result.message += " with isolation level " + stmt.isolation_level;
+        }
+    } else {
+        // No WAL - simulate transaction
+        current_txn_id_ = 1;
+        result.success = true;
+        result.message = "Transaction started (WAL disabled)";
+    }
+    
+    return result;
+}
+
+QueryResult Executor::executeCommit() {
+    QueryResult result;
+    
+    if (current_txn_id_ == INVALID_TXN_ID) {
+        result.error_message = "No transaction in progress";
+        return result;
+    }
+    
+    if (wal_) {
+        wal_->commitTransaction(current_txn_id_);
+    }
+    
+    // Release all locks held by this transaction
+    if (lock_mgr_) {
+        lock_mgr_->releaseAllLocks(current_txn_id_);
+    }
+    
+    // Flush dirty pages
+    buffer_pool_.flushAllPages();
+    
+    result.success = true;
+    result.message = "Transaction committed";
+    current_txn_id_ = INVALID_TXN_ID;
+    
+    return result;
+}
+
+QueryResult Executor::executeRollback() {
+    QueryResult result;
+    
+    if (current_txn_id_ == INVALID_TXN_ID) {
+        result.error_message = "No transaction in progress";
+        return result;
+    }
+    
+    if (wal_) {
+        wal_->abortTransaction(current_txn_id_);
+    }
+    
+    // Release all locks held by this transaction
+    if (lock_mgr_) {
+        lock_mgr_->releaseAllLocks(current_txn_id_);
+    }
+    
+    result.success = true;
+    result.message = "Transaction rolled back";
+    current_txn_id_ = INVALID_TXN_ID;
+    
     return result;
 }
 

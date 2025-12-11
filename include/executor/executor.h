@@ -4,6 +4,9 @@
 #include "parser/parser.h"
 #include "catalog/catalog.h"
 #include "storage/buffer_pool.h"
+#include "storage/wal.h"
+#include "concurrency/lock_manager.h"
+#include "concurrency/transaction.h"
 #include "index/btree.h"
 
 namespace minidb {
@@ -37,14 +40,23 @@ struct CombinedSchema {
 // Query executor
 class Executor {
 public:
-    Executor(Catalog& catalog, BufferPool& buffer_pool);
+    Executor(Catalog& catalog, BufferPool& buffer_pool, 
+             WalManager* wal = nullptr, LockManager* lock_mgr = nullptr);
     
     // Execute a parsed statement
     QueryResult execute(const Statement& stmt);
+    
+    // Transaction control
+    QueryResult executeBegin(const BeginStatement& stmt);
+    QueryResult executeCommit();
+    QueryResult executeRollback();
 
 private:
     Catalog& catalog_;
     BufferPool& buffer_pool_;
+    WalManager* wal_;
+    LockManager* lock_mgr_;
+    TxnId current_txn_id_ = INVALID_TXN_ID;
     
     // Statement executors
     QueryResult executeSelect(const SelectStatement& stmt);

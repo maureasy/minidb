@@ -80,6 +80,9 @@ public:
     std::vector<IndexInfo> getIndexesForTable(const std::string& table_name) const;
     std::vector<std::string> getIndexNames() const;
     
+    // Rebuild index from existing table data
+    void rebuildIndex(const std::string& table_name, class BufferPool& buffer_pool);
+    
     // Persistence
     void save(const std::string& path);
     void load(const std::string& path);

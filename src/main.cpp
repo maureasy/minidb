@@ -1,6 +1,8 @@
 #include "common.h"
 #include "storage/file_manager.h"
 #include "storage/buffer_pool.h"
+#include "storage/wal.h"
+#include "concurrency/lock_manager.h"
 #include "catalog/catalog.h"
 #include "parser/parser.h"
 #include "executor/executor.h"
@@ -124,6 +126,14 @@ int main(int argc, char* argv[]) {
     try {
         FileManager file_manager(db_path);
         BufferPool buffer_pool(file_manager, 64);
+        
+        // Initialize WAL for crash recovery
+        std::string wal_path = db_path + ".wal";
+        WalManager wal_manager(wal_path);
+        
+        // Initialize Lock Manager for concurrency
+        LockManager lock_manager;
+        
         Catalog catalog;
         
         // Load catalog if exists
@@ -132,9 +142,14 @@ int main(int argc, char* argv[]) {
             cat_file.close();
             catalog.load(catalog_path);
             std::cout << "Loaded existing database\n";
+            
+            // Rebuild indexes from existing data
+            for (const auto& table_name : catalog.getTableNames()) {
+                catalog.rebuildIndex(table_name, buffer_pool);
+            }
         }
         
-        Executor executor(catalog, buffer_pool);
+        Executor executor(catalog, buffer_pool, &wal_manager, &lock_manager);
         
         std::string line;
         std::string input;

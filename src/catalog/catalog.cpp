@@ -1,4 +1,5 @@
 #include "catalog/catalog.h"
+#include "storage/buffer_pool.h"
 #include <fstream>
 
 namespace minidb {
@@ -294,6 +295,73 @@ void Catalog::load(const std::string& path) {
     
     // Read next_table_id
     file.read(reinterpret_cast<char*>(&next_table_id_), sizeof(TableId));
+}
+
+void Catalog::rebuildIndex(const std::string& table_name, BufferPool& buffer_pool) {
+    auto table_opt = getTable(table_name);
+    if (!table_opt) return;
+    
+    const TableSchema& schema = table_opt.value();
+    
+    // Only rebuild if table has a primary key
+    if (!schema.primary_key_column.has_value()) return;
+    
+    BTree* index = getIndex(table_name);
+    if (!index) return;
+    
+    // Clear existing index
+    index->clear();
+    
+    // Scan table and rebuild index
+    if (schema.first_page == INVALID_PAGE_ID) return;
+    
+    PageId current_page_id = schema.first_page;
+    ColumnId pk_col = schema.primary_key_column.value();
+    
+    while (current_page_id != INVALID_PAGE_ID) {
+        Page* page = buffer_pool.fetchPage(current_page_id);
+        if (!page) break;
+        
+        for (SlotId slot = 0; slot < page->getNumSlots(); slot++) {
+            char buffer[PAGE_SIZE];
+            uint16_t length;
+            
+            if (page->getRecord(slot, buffer, length)) {
+                // Parse the record to get primary key value
+                size_t offset = 0;
+                for (ColumnId col = 0; col <= pk_col && offset < length; col++) {
+                    uint8_t type_tag = static_cast<uint8_t>(buffer[offset++]);
+                    
+                    if (col == pk_col) {
+                        if (type_tag == 1) {  // INT
+                            int64_t key;
+                            std::memcpy(&key, buffer + offset, sizeof(int64_t));
+                            index->insert(key, {current_page_id, slot});
+                        }
+                        break;
+                    }
+                    
+                    // Skip to next column based on type
+                    switch (type_tag) {
+                        case 0: break;  // NULL
+                        case 1: offset += sizeof(int64_t); break;  // INT
+                        case 2: offset += sizeof(double); break;   // FLOAT
+                        case 3: {  // STRING
+                            uint16_t len;
+                            std::memcpy(&len, buffer + offset, sizeof(uint16_t));
+                            offset += sizeof(uint16_t) + len;
+                            break;
+                        }
+                        case 4: offset += 1; break;  // BOOL
+                    }
+                }
+            }
+        }
+        
+        PageId next_page = page->getNextPage();
+        buffer_pool.unpinPage(current_page_id, false);
+        current_page_id = next_page;
+    }
 }
 
 } // namespace minidb
