@@ -130,6 +130,9 @@ bool Page::updateRecord(SlotId slot_id, const char* data, uint16_t length) {
 }
 
 void Page::serialize(char* buffer) const {
+    // Zero the buffer first
+    std::memset(buffer, 0, PAGE_SIZE);
+    
     size_t offset = 0;
     
     // Write header
@@ -152,10 +155,17 @@ void Page::serialize(char* buffer) const {
         offset += sizeof(uint8_t);
     }
     
-    // Write data section
-    std::memcpy(buffer + PAGE_SIZE - (PAGE_SIZE - header_.free_space_end), 
-                data_ + header_.free_space_end, 
-                PAGE_SIZE - header_.free_space_end);
+    // Write data section (record data is stored at the end of the page)
+    if (header_.free_space_end < PAGE_SIZE) {
+        std::memcpy(buffer + header_.free_space_end, 
+                    data_ + header_.free_space_end, 
+                    PAGE_SIZE - header_.free_space_end);
+    }
+    
+    // Calculate and store checksum (excluding the checksum field itself)
+    // Checksum is at offset 16 in header (after page_id, num_slots, free_space_offset, free_space_end, next_page)
+    uint32_t checksum = calculateChecksum(buffer + sizeof(uint32_t), PAGE_SIZE - sizeof(uint32_t));
+    std::memcpy(buffer + offsetof(PageHeader, checksum), &checksum, sizeof(uint32_t));
 }
 
 void Page::deserialize(const char* buffer) {
@@ -186,8 +196,26 @@ void Page::deserialize(const char* buffer) {
         slots_.push_back(slot);
     }
     
-    // Read data section
-    std::memcpy(data_, buffer, PAGE_SIZE);
+    // Read data section (record data is stored at the end of the page)
+    // Only copy the data region, not the metadata we already parsed
+    if (header_.free_space_end < PAGE_SIZE) {
+        std::memcpy(data_ + header_.free_space_end, 
+                    buffer + header_.free_space_end, 
+                    PAGE_SIZE - header_.free_space_end);
+    }
+}
+
+uint32_t Page::calculateChecksum(const char* data, size_t length) {
+    // CRC-like checksum algorithm
+    uint32_t checksum = 0;
+    for (size_t i = 0; i < length; i++) {
+        checksum = (checksum << 1) ^ static_cast<uint8_t>(data[i]);
+        // Fold high bits back in
+        if (checksum & 0x80000000) {
+            checksum ^= 0x04C11DB7;  // CRC-32 polynomial
+        }
+    }
+    return checksum;
 }
 
 } // namespace minidb

@@ -183,8 +183,14 @@ private:
 // Database-level lock manager (simpler approach)
 class DatabaseLockManager {
 public:
-    TableLock& getTableLock(const std::string& table_name) {
+    // Returns a pointer to avoid reference invalidation on map rehash
+    // The shared_ptr ensures the TableLock stays valid even if the map rehashes
+    std::shared_ptr<TableLock> getTableLock(const std::string& table_name) {
         std::lock_guard<std::mutex> lock(mutex_);
+        auto it = table_locks_.find(table_name);
+        if (it == table_locks_.end()) {
+            table_locks_[table_name] = std::make_shared<TableLock>();
+        }
         return table_locks_[table_name];
     }
     
@@ -196,7 +202,7 @@ public:
 
 private:
     std::mutex mutex_;
-    std::unordered_map<std::string, TableLock> table_locks_;
+    std::unordered_map<std::string, std::shared_ptr<TableLock>> table_locks_;
     TableLock db_lock_;
 };
 

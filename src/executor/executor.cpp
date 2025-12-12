@@ -135,6 +135,13 @@ std::vector<Row> Executor::scanTable(const std::string& table_name) {
     
     const TableSchema& schema = table_opt.value();
     
+    // Acquire shared (read) lock on table if lock manager and transaction are active
+    if (lock_mgr_ && current_txn_id_ != INVALID_TXN_ID) {
+        if (!lock_mgr_->lockTable(current_txn_id_, schema.id, LockMode::SHARED)) {
+            return rows;  // Could not acquire lock
+        }
+    }
+    
     if (schema.first_page == INVALID_PAGE_ID) {
         return rows;  // Empty table
     }
@@ -146,12 +153,12 @@ std::vector<Row> Executor::scanTable(const std::string& table_name) {
         if (!page) break;
         
         // Iterate through all slots
+        std::vector<char> buffer(PAGE_SIZE);
         for (SlotId slot = 0; slot < page->getNumSlots(); slot++) {
-            char buffer[PAGE_SIZE];
             uint16_t length;
             
-            if (page->getRecord(slot, buffer, length)) {
-                Row row = deserializeRow(buffer, length, schema);
+            if (page->getRecord(slot, buffer.data(), length)) {
+                Row row = deserializeRow(buffer.data(), length, schema);
                 rows.push_back(std::move(row));
             }
         }
@@ -169,6 +176,13 @@ bool Executor::insertRow(const std::string& table_name, const Row& row) {
     if (!table_opt) return false;
     
     TableSchema schema = table_opt.value();
+    
+    // Acquire exclusive (write) lock on table if lock manager and transaction are active
+    if (lock_mgr_ && current_txn_id_ != INVALID_TXN_ID) {
+        if (!lock_mgr_->lockTable(current_txn_id_, schema.id, LockMode::EXCLUSIVE)) {
+            return false;  // Could not acquire lock
+        }
+    }
     
     std::string data = serializeRow(row, schema);
     
@@ -1100,6 +1114,14 @@ QueryResult Executor::executeUpdate(const UpdateStatement& stmt) {
     
     const TableSchema& schema = table_opt.value();
     
+    // Acquire exclusive (write) lock on table if lock manager and transaction are active
+    if (lock_mgr_ && current_txn_id_ != INVALID_TXN_ID) {
+        if (!lock_mgr_->lockTable(current_txn_id_, schema.id, LockMode::EXCLUSIVE)) {
+            result.error_message = "Could not acquire lock on table: " + stmt.table_name;
+            return result;
+        }
+    }
+    
     // Build assignment map
     std::vector<std::pair<int, Value>> assignments;
     for (const auto& [col_name, val] : stmt.assignments) {
@@ -1175,6 +1197,14 @@ QueryResult Executor::executeDelete(const DeleteStatement& stmt) {
     }
     
     const TableSchema& schema = table_opt.value();
+    
+    // Acquire exclusive (write) lock on table if lock manager and transaction are active
+    if (lock_mgr_ && current_txn_id_ != INVALID_TXN_ID) {
+        if (!lock_mgr_->lockTable(current_txn_id_, schema.id, LockMode::EXCLUSIVE)) {
+            result.error_message = "Could not acquire lock on table: " + stmt.table_name;
+            return result;
+        }
+    }
     
     if (schema.first_page == INVALID_PAGE_ID) {
         result.success = true;

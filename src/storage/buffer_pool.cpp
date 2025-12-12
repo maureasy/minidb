@@ -167,6 +167,34 @@ bool BufferPool::deletePage(PageId page_id) {
     return true;
 }
 
+bool BufferPool::discardPage(PageId page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    auto it = page_table_.find(page_id);
+    if (it == page_table_.end()) {
+        return true;  // Page not in buffer pool, nothing to discard
+    }
+    
+    size_t frame_id = it->second;
+    
+    // Force unpin (reset pin count for abort scenario)
+    pages_[frame_id].resetPinCount();
+    
+    // Remove from LRU
+    auto lru_it = lru_map_.find(frame_id);
+    if (lru_it != lru_map_.end()) {
+        lru_list_.erase(lru_it->second);
+        lru_map_.erase(lru_it);
+    }
+    
+    // Add frame back to free list
+    free_frames_.push_back(frame_id);
+    page_table_.erase(it);
+    
+    // Page will be reloaded from disk on next fetch
+    return true;
+}
+
 size_t BufferPool::findVictimFrame() {
     // First, try to use a free frame
     if (!free_frames_.empty()) {

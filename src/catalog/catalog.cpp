@@ -9,7 +9,8 @@ Catalog::Catalog() {}
 Catalog::~Catalog() {}
 
 bool Catalog::createTable(const std::string& name, const std::vector<ColumnInfo>& columns) {
-    if (tableExists(name)) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (tables_.find(name) != tables_.end()) {
         return false;
     }
     
@@ -30,13 +31,16 @@ bool Catalog::createTable(const std::string& name, const std::vector<ColumnInfo>
     
     tables_[name] = schema;
     
-    // Create index for the table (on primary key if exists)
-    createIndex(name);
+    // Create index for the table (on primary key if exists) - internal, no lock needed
+    if (indexes_.find(name) == indexes_.end()) {
+        indexes_[name] = std::make_unique<BTree>();
+    }
     
     return true;
 }
 
 bool Catalog::dropTable(const std::string& name) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = tables_.find(name);
     if (it == tables_.end()) {
         return false;
@@ -48,10 +52,12 @@ bool Catalog::dropTable(const std::string& name) {
 }
 
 bool Catalog::tableExists(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return tables_.find(name) != tables_.end();
 }
 
 std::optional<TableSchema> Catalog::getTable(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = tables_.find(name);
     if (it == tables_.end()) {
         return std::nullopt;
@@ -60,6 +66,7 @@ std::optional<TableSchema> Catalog::getTable(const std::string& name) const {
 }
 
 std::vector<std::string> Catalog::getTableNames() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> names;
     for (const auto& [name, schema] : tables_) {
         names.push_back(name);
@@ -68,14 +75,16 @@ std::vector<std::string> Catalog::getTableNames() const {
 }
 
 void Catalog::updateRowCount(const std::string& name, int64_t delta) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = tables_.find(name);
     if (it != tables_.end()) {
-        it->second.row_count = static_cast<uint64_t>(
-            static_cast<int64_t>(it->second.row_count) + delta);
+        int64_t new_count = static_cast<int64_t>(it->second.row_count) + delta;
+        it->second.row_count = (new_count < 0) ? 0 : static_cast<uint64_t>(new_count);
     }
 }
 
 void Catalog::setFirstPage(const std::string& name, PageId page_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = tables_.find(name);
     if (it != tables_.end()) {
         it->second.first_page = page_id;
@@ -83,6 +92,7 @@ void Catalog::setFirstPage(const std::string& name, PageId page_id) {
 }
 
 BTree* Catalog::getIndex(const std::string& table_name) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = indexes_.find(table_name);
     if (it == indexes_.end()) {
         return nullptr;
@@ -91,6 +101,7 @@ BTree* Catalog::getIndex(const std::string& table_name) {
 }
 
 BTree* Catalog::getIndexByName(const std::string& index_name) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = indexes_.find(index_name);
     if (it == indexes_.end()) {
         return nullptr;
@@ -99,6 +110,7 @@ BTree* Catalog::getIndexByName(const std::string& index_name) {
 }
 
 void Catalog::createIndex(const std::string& table_name) {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (indexes_.find(table_name) == indexes_.end()) {
         indexes_[table_name] = std::make_unique<BTree>();
     }
@@ -106,20 +118,25 @@ void Catalog::createIndex(const std::string& table_name) {
 
 bool Catalog::createNamedIndex(const std::string& index_name, const std::string& table_name,
                                 const std::vector<std::string>& columns, bool is_unique) {
-    if (indexExists(index_name)) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Check if index already exists
+    if (indexes_.find(index_name) != indexes_.end() ||
+        index_info_.find(index_name) != index_info_.end()) {
         return false;
     }
     
-    if (!tableExists(table_name)) {
+    // Check if table exists
+    auto table_it = tables_.find(table_name);
+    if (table_it == tables_.end()) {
         return false;
     }
     
     // Verify all columns exist
-    auto table_opt = getTable(table_name);
-    if (!table_opt) return false;
+    const TableSchema& table_schema = table_it->second;
     
     for (const auto& col_name : columns) {
-        if (table_opt->getColumnIndex(col_name) < 0) {
+        if (table_schema.getColumnIndex(col_name) < 0) {
             return false;
         }
     }
@@ -140,6 +157,7 @@ bool Catalog::createNamedIndex(const std::string& index_name, const std::string&
 }
 
 bool Catalog::dropIndex(const std::string& index_name) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = indexes_.find(index_name);
     if (it == indexes_.end()) {
         return false;
@@ -151,11 +169,13 @@ bool Catalog::dropIndex(const std::string& index_name) {
 }
 
 bool Catalog::indexExists(const std::string& index_name) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return indexes_.find(index_name) != indexes_.end() ||
            index_info_.find(index_name) != index_info_.end();
 }
 
 std::vector<IndexInfo> Catalog::getIndexesForTable(const std::string& table_name) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::vector<IndexInfo> result;
     for (const auto& [name, info] : index_info_) {
         if (info.table_name == table_name) {
@@ -166,6 +186,7 @@ std::vector<IndexInfo> Catalog::getIndexesForTable(const std::string& table_name
 }
 
 std::vector<std::string> Catalog::getIndexNames() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> names;
     for (const auto& [name, info] : index_info_) {
         names.push_back(name);
@@ -174,6 +195,7 @@ std::vector<std::string> Catalog::getIndexNames() const {
 }
 
 void Catalog::save(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::ofstream file(path, std::ios::binary);
     if (!file) return;
     
@@ -228,6 +250,7 @@ void Catalog::save(const std::string& path) {
 }
 
 void Catalog::load(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::ifstream file(path, std::ios::binary);
     if (!file) return;
     
@@ -290,7 +313,10 @@ void Catalog::load(const std::string& path) {
         }
         
         tables_[name] = schema;
-        createIndex(name);
+        // Create index internally - no lock needed since we already hold it
+        if (indexes_.find(name) == indexes_.end()) {
+            indexes_[name] = std::make_unique<BTree>();
+        }
     }
     
     // Read next_table_id
@@ -322,34 +348,44 @@ void Catalog::rebuildIndex(const std::string& table_name, BufferPool& buffer_poo
         Page* page = buffer_pool.fetchPage(current_page_id);
         if (!page) break;
         
+        std::vector<char> buffer(PAGE_SIZE);
         for (SlotId slot = 0; slot < page->getNumSlots(); slot++) {
-            char buffer[PAGE_SIZE];
             uint16_t length;
             
-            if (page->getRecord(slot, buffer, length)) {
+            if (page->getRecord(slot, buffer.data(), length)) {
                 // Parse the record to get primary key value
                 size_t offset = 0;
                 for (ColumnId col = 0; col <= pk_col && offset < length; col++) {
+                    if (offset >= length) break;
                     uint8_t type_tag = static_cast<uint8_t>(buffer[offset++]);
                     
                     if (col == pk_col) {
-                        if (type_tag == 1) {  // INT
+                        if (type_tag == 1 && offset + sizeof(int64_t) <= length) {  // INT
                             int64_t key;
-                            std::memcpy(&key, buffer + offset, sizeof(int64_t));
+                            std::memcpy(&key, buffer.data() + offset, sizeof(int64_t));
                             index->insert(key, {current_page_id, slot});
                         }
                         break;
                     }
                     
-                    // Skip to next column based on type
+                    // Skip to next column based on type (with bounds checking)
                     switch (type_tag) {
                         case 0: break;  // NULL
                         case 1: offset += sizeof(int64_t); break;  // INT
                         case 2: offset += sizeof(double); break;   // FLOAT
                         case 3: {  // STRING
+                            if (offset + sizeof(uint16_t) > length) {
+                                offset = length;  // Force exit
+                                break;
+                            }
                             uint16_t len;
-                            std::memcpy(&len, buffer + offset, sizeof(uint16_t));
-                            offset += sizeof(uint16_t) + len;
+                            std::memcpy(&len, buffer.data() + offset, sizeof(uint16_t));
+                            offset += sizeof(uint16_t);
+                            if (offset + len > length) {
+                                offset = length;  // Force exit
+                                break;
+                            }
+                            offset += len;
                             break;
                         }
                         case 4: offset += 1; break;  // BOOL

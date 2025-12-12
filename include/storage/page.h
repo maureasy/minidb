@@ -59,6 +59,7 @@ public:
     int getPinCount() const { return pin_count_; }
     void incrementPinCount() { ++pin_count_; }
     void decrementPinCount() { if (pin_count_ > 0) --pin_count_; }
+    void resetPinCount() { pin_count_ = 0; }
 
 private:
     PageHeader header_;
@@ -69,6 +70,9 @@ private:
     
     void initializePage();
     uint16_t getSlotArraySize() const;
+    
+    // Checksum calculation
+    static uint32_t calculateChecksum(const char* data, size_t length);
 };
 
 } // namespace minidb

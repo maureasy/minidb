@@ -7,6 +7,8 @@ namespace minidb {
 constexpr uint32_t MAGIC_NUMBER = 0x4D494E49;  // "MINI"
 constexpr uint32_t VERSION = 1;
 constexpr size_t HEADER_SIZE = 64;
+constexpr size_t MAX_FREE_LIST_ENTRIES = 1024;  // Fixed allocation for free list
+constexpr size_t FREE_LIST_SIZE = MAX_FREE_LIST_ENTRIES * sizeof(PageId);
 
 FileManager::FileManager(const std::string& db_path) : db_path_(db_path) {
     openOrCreate();
@@ -65,8 +67,8 @@ void FileManager::readHeader() {
     std::memcpy(&num_free, header + 12, sizeof(uint32_t));
     free_pages_.clear();
     
-    // Free pages are stored after the header if there are any
-    if (num_free > 0 && num_free < 1000) {  // Sanity check
+    // Free pages are stored in fixed area after the header
+    if (num_free > 0 && num_free <= MAX_FREE_LIST_ENTRIES) {
         file_.seekg(HEADER_SIZE);
         for (uint32_t i = 0; i < num_free; i++) {
             PageId pid;
@@ -89,12 +91,10 @@ void FileManager::writeHeader() {
     file_.seekp(0);
     file_.write(header, HEADER_SIZE);
     
-    // Write free pages list
-    if (!free_pages_.empty()) {
-        file_.seekp(HEADER_SIZE);
-        for (PageId pid : free_pages_) {
-            file_.write(reinterpret_cast<const char*>(&pid), sizeof(PageId));
-        }
+    // Write free pages list (always write to fixed location)
+    file_.seekp(HEADER_SIZE);
+    for (size_t i = 0; i < free_pages_.size() && i < MAX_FREE_LIST_ENTRIES; i++) {
+        file_.write(reinterpret_cast<const char*>(&free_pages_[i]), sizeof(PageId));
     }
     
     file_.flush();
@@ -105,9 +105,8 @@ bool FileManager::readPage(PageId page_id, Page& page) {
         return false;
     }
     
-    // Calculate offset (header + free list + pages)
-    size_t free_list_size = free_pages_.size() * sizeof(PageId);
-    size_t page_offset = HEADER_SIZE + free_list_size + (static_cast<size_t>(page_id) * PAGE_SIZE);
+    // Calculate offset (header + fixed free list area + pages)
+    size_t page_offset = HEADER_SIZE + FREE_LIST_SIZE + (static_cast<size_t>(page_id) * PAGE_SIZE);
     
     char buffer[PAGE_SIZE];
     file_.seekg(page_offset);
@@ -127,9 +126,8 @@ bool FileManager::writePage(PageId page_id, const Page& page) {
         return false;
     }
     
-    // Calculate offset
-    size_t free_list_size = free_pages_.size() * sizeof(PageId);
-    size_t page_offset = HEADER_SIZE + free_list_size + (static_cast<size_t>(page_id) * PAGE_SIZE);
+    // Calculate offset (header + fixed free list area + pages)
+    size_t page_offset = HEADER_SIZE + FREE_LIST_SIZE + (static_cast<size_t>(page_id) * PAGE_SIZE);
     
     char buffer[PAGE_SIZE];
     page.serialize(buffer);

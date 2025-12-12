@@ -88,6 +88,7 @@ public:
     void load(const std::string& path);
 
 private:
+    mutable std::mutex mutex_;
     std::unordered_map<std::string, TableSchema> tables_;
     std::unordered_map<std::string, std::unique_ptr<BTree>> indexes_;
     std::unordered_map<std::string, IndexInfo> index_info_;

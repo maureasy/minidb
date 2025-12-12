@@ -103,16 +103,20 @@ bool TransactionManager::abortTransaction(Transaction* txn) {
 }
 
 void TransactionManager::undoTransaction(Transaction* txn) {
-    // In a full implementation, we would:
-    // 1. Read the WAL backwards for this transaction
-    // 2. For each INSERT: delete the record
-    // 3. For each DELETE: re-insert the old record
-    // 4. For each UPDATE: restore the old value
+    // Discard all modified pages from the buffer pool.
+    // This discards uncommitted changes by evicting the dirty pages
+    // without writing them to disk. On next access, the page will be
+    // reloaded from disk with its last committed state.
+    //
+    // This is a NO-STEAL approach for simplicity - we assume pages
+    // modified by uncommitted transactions haven't been flushed to disk.
+    // For full STEAL/NO-FORCE, we would need to read WAL backwards
+    // and apply inverse operations (CLRs).
     
-    // For now, we just discard dirty pages (simplified undo)
     for (PageId page_id : txn->getModifiedPages()) {
-        // Discard the page from buffer pool (don't flush)
-        buffer_pool_.unpinPage(page_id, false);
+        // Discard the page - removes from buffer pool without flushing
+        // The page will be reloaded from disk on next fetch
+        buffer_pool_.discardPage(page_id);
     }
 }
 
