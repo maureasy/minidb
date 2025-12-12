@@ -178,6 +178,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{E126E2C9-483C-3E03-8F89-612B20E6F672}</Project>
       <Name>minidb</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\maure\Documents\Development\Charlie_project\minidb\build\tests\test_fixes.vcxproj">
+      <Project>{3AF40389-D07A-3739-9C12-20D869C0AA92}</Project>
+      <Name>test_fixes</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

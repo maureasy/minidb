@@ -39,6 +39,3 @@ if(MSVC)
 else()
     target_compile_options(minidb PRIVATE -Wall -Wextra -Wpedantic)
 endif()
-
-# Tests
-add_subdirectory(tests)
